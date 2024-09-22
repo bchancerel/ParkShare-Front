@@ -36,6 +36,7 @@
             <div class="map-container">
                 <hr>
                 <p><strong> {{ parkingSpots.rating }} </strong> ⭐ | {{ parkingSpots.hourPrice }} €/j</p>
+                <p>By : <strong> {{ user.firstname }} {{ user.lastname }} </strong></p>
             </div>
           </div>
 
@@ -58,7 +59,13 @@
                 <input type="time" class="form-control" id="endTime" v-model="reservation.endTime" required>
             </div>
             <div class="col-12">
-                <button type="submit" class="btn btn-primary">Réserver</button>
+              <div v-if="loading == true" class="spinner-border text-success" role="status">
+                  <span class="visually-hidden">Loading...</span>
+              </div>
+              <button v-else type="submit" class="btn btn-primary">Réserver</button>
+              <div v-if="logMessage.length > 0" class="alert alert-success" role="alert">
+                {{ logMessage }}
+              </div>
             </div>
         </form>
       </div>
@@ -92,7 +99,7 @@
         <div v-for="(item, index) in feedbacks" :key="index" class="col-md-6">
           <div class="card mb-3">
             <div class="card-body">
-              <p><strong>Utilisateur 1</strong></p>
+              <p><strong>{{ item.firstname }} {{ item.lastname }}</strong></p>
               <p>{{ item.description }}</p>
               <p>{{ item.rating }} ⭐</p>
               <p>écrit le : <strong>{{ formatDate(item.date) }}</strong></p>
@@ -105,8 +112,6 @@
 </template>
 
 <script>
-import Axios from 'axios'
-
 export default {
   name: 'AnnonceView',
   
@@ -127,7 +132,13 @@ export default {
         endDate: '',
         endTime: ''
       },
-      feedbacks: []
+      user: {
+        firstname: '',
+        lastname: ''
+      },
+      feedbacks: [],
+      loading: false,
+      logMessage: ''
     };
   },
   mounted() {
@@ -173,6 +184,7 @@ export default {
           this.marker.position.lat = this.parkingSpots.latitude
           this.marker.position.lng = this.parkingSpots.longitude
           this.NoteAd(this.parkingSpots)
+          this.getUser(this.parkingSpots.userId)
         } catch (error) {
             console.log("coucou")
             console.error(error);
@@ -181,6 +193,24 @@ export default {
       } else {
           this.setFallBackData();
       }
+    },
+    async getUser(id) {
+      const idToken = localStorage.getItem('idToken');
+
+      const url = `http://localhost:8080/api/user/${id}`
+
+      const response = await fetch(url, {
+          method: 'GET',
+          headers: {
+              'Authorization': `Bearer ${idToken}`,
+              'Content-Type': 'application/json'
+          }
+      });
+
+      const data = await response.json()
+      console.log(data)
+      this.user.firstname = data.firstname
+      this.user.lastname = data.lastname
     },
     async NoteAd(item) {
       try {
@@ -195,7 +225,23 @@ export default {
         if (!response.ok) throw new Error('Failed to fetch ratings');
         const ratings = await response.json();
         this.feedbacks = ratings
-        console.log(this.feedbacks)
+
+        for (let i in this.feedbacks) {
+          const url = `http://localhost:8080/api/user/${this.feedbacks[i].userId}`
+
+          const response = await fetch(url, {
+              method: 'GET',
+              headers: {
+                  'Authorization': `Bearer ${token}`,
+                  'Content-Type': 'application/json'
+              }
+          });
+
+          const data = await response.json()
+          this.feedbacks[i].firstname = data.firstname
+          this.feedbacks[i].lastname = data.lastname
+        }
+
         let averageRating = 0; // Default average rating
         if (ratings.length > 0) {
           averageRating = ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length;
@@ -224,16 +270,53 @@ export default {
       this.marker.lat = this.parkingSpots.lat
       this.marker.lng = this.parkingSpots.long
     },
-    submitReservation() {
-        Axios.post('https://api.votresite.com/reservations', this.reservation)
-        .then(response => {
-            alert('Réservation enregistrée !');
-            console.log(response)
-            this.reservation = { startDate: '', startTime: '', endDate: '', endTime: '' }; // Réinitialiser le formulaire
-        })
-        .catch(error => {
-            alert('Erreur lors de la réservation : ' + error.message);
+    async submitReservation() {
+      this.loading = true
+
+      console.log(this.reservation)
+
+      const beginDate = new Date(this.reservation.startDate + 'T' + this.reservation.startTime)
+      const endDate = new Date(this.reservation.endDate + 'T' + this.reservation.endTime)
+      
+
+      const beginDateISO = beginDate.toISOString()
+      const endDateISO = endDate.toISOString()
+
+      const finalbeginDate = beginDateISO.slice(0, -5)
+      const finalendDate = endDateISO.slice(0, -5)
+
+      try {
+        const idToken = localStorage.getItem('idToken');
+
+        const url = 'http://localhost:8080/api/reservation'
+
+        const updatedData = {
+          statusId: 2,
+          beginDate: finalbeginDate,
+          endDate: finalendDate,
+          adId: this.parkingSpots.id
+        }
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${idToken}`, // Ajoute le token dans les headers
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(updatedData)
         });
+
+        console.log(response)
+        if (response.status == 201) {
+            console.log("success")
+            this.logMessage = "Réservation effecuté avec succès"
+        }
+      } catch (error) {
+          console.error('Erreur lors de la soumission du formulaire:', error);
+          alert('Une erreur est survenue lors de la soumission du formulaire');
+      }
+      this.loading = false
+        
     },
     formatDate(dateString) {
       const options = { year: 'numeric', month: 'long', day: 'numeric' };

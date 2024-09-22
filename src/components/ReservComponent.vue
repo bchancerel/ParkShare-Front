@@ -25,36 +25,53 @@
                     </div>
     
                     <div class="col-md-6">
-                        <h3>{{ parkingSpots.titre }}</h3>
+                        <h3>{{ parkingSpots.name }}</h3>
                         <div class="description mb-3">
                             <h5>Description</h5>
                             <p>
-                                Lorem ipsum dolor sit amet consectetur adipiscing elit. Maxime mollitia, molestiae quas vel sint commodi repudiandae consequuntur voluptatum 
-                                laborumnumquam blanditiis harum quisquamemnihil commodoris! 
-                                Consequuntur voluptatum laborumnumquam blanditiis harum quisquamemnihil commodoris!
+                                {{ parkingSpots.description }}
                             </p>
                         </div>
                         <!-- Section Carte -->
                         <div class="map-container">
                             <hr>
-                            <p><strong> {{ parkingSpots.note }} </strong> ⭐ | {{ parkingSpots.prix }} €/j</p>
+                            <p><strong> {{ parkingSpots.rating }} </strong> ⭐ | {{ parkingSpots.hourPrice }} € / h</p>
                         </div>
                     </div>
 
-                    <div class="col-12 mt-5">
-                        <div v-for="person in people" :key="person.id" class="row mb-3">
+                    <div v-if="reservations.length > 0" class="col-12 mt-5">
+                        <div v-for="reservation in reservations" :key="reservation.id" class="row mb-3">
                             <div class="col-md-2">
                                 <i class="fa fa-user-circle fa-2x"></i>
                             </div>
-                            <div class="col-md-6">
-                                <p>{{ person.name }}</p>
-                                <p>{{ person.date }}</p>
+                            <div class="col-md-2">
+                                <small>{{ reservation.firstname }} {{ reservation.lastname }}</small>
                             </div>
-                            <div class="col-md-4">
-                                <button class="btn btn-primary" @click="accept(person.id)">Accepter</button>
-                                <button class="btn btn-danger" @click="refuse(person.id)">Refuser</button>
+                            <div class="col-md-6">
+                                <small>{{ formatDate(reservation.beginDate) }} to {{ formatDate(reservation.endDate) }}</small>
+                                
+                            </div>
+                            <div class="col-md-2">
+                                <small>{{ reservation.totalPrice }} €</small>
+
+                            </div>
+                            <div class="col-md-12 d-flex justify-content-around">
+                                <div v-if="acceptLoading == true" class="spinner-border text-success" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <button v-else class="btn btn-primary" @click="accept(reservation.id)">Accepter</button>
+                                <div v-if="cancelLoading == true" class="spinner-border text-danger" role="status">
+                                    <span class="visually-hidden">Loading...</span>
+                                </div>
+                                <button v-else class="btn btn-danger" @click="refuse(reservation.id)">Refuser</button>
+                            </div>
+                            <div v-if="reservations.length > 1">
+                                <hr>
                             </div>
                         </div>
+                    </div>
+                    <div v-else class="col-12 mt-5">
+                        <p>Il n'y a aucune réservation sur cette annonce... Pour le moment.</p>
                     </div>
 
 
@@ -64,7 +81,7 @@
           <!-- Map section -->
             <div class="col-6">
                 <GMapMap
-                    :center="{ lat: 44.8378, lng: -0.5792 }"
+                    :center="marker.position"
                     :zoom="12" 
                     map-type-id="terrain" 
                     style="width: 100%; height: 700px;"
@@ -76,10 +93,10 @@
                         rotateControl: true,
                         fullscreenControl: true
                     }"
-                >      
-                    <GMapMarker
-                        :key=parkingSpots.titre
-                        :position="marker"></GMapMarker>
+                    >      
+                <GMapMarker
+                    :key=parkingSpots.titre
+                    :position="marker.position"></GMapMarker>
                 </GMapMap>
             </div>
         </div>
@@ -96,22 +113,18 @@ export default {
         return {
             components: 'view',
             parkingSpots: {},
-            apiurl: '',
+            apiurl: 'http://localhost:8080/api/ads',
             marker: {
-                lat: 0,
-                lng: 0
+                id : "",
+                position: {
+                    lat: 0,
+                    lng: 0
+                }
             },
-            reservation: {
-                startDate: '',
-                startTime: '',
-                endDate: '',
-                endTime: ''
-            },
-            people: [
-                { id: 1, name: 'Nom Prénom', date: 'Date début - Date fin' },
-                { id: 2, name: 'Nom Prénom', date: 'Date début - Date fin' },
-                { id: 3, name: 'Nom Prénom', date: 'Date début - Date fin' }
-            ]
+            feedbacks: [],
+            reservations: [],
+            cancelLoading: false,
+            acceptLoading: false
         };
     },
     mounted() {
@@ -120,19 +133,114 @@ export default {
     methods: {
         async fetchParkingSpots() {
             if (this.apiurl !== '') {
+                const id = this.$route.params.id;
                 try {
-                    const response = await fetch(this.apiurl);
-                    if (!response.ok) throw new Error('Api call failed')
-                    const data = await response.json()
-                    this.parkingSpots = data
-                    this.marker.lat = this.parkingSpots.lat
-                    this.marker.lng = this.parkingSpots.long
+                    const token = localStorage.getItem('idToken'); // Récupère le token d'authentification
+                    const response = await fetch(this.apiurl + '/' + id, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${token}`, // Ajoute le token dans les headers
+                        'Content-Type': 'application/json'
+                    }
+                    });
+                    if (!response.ok) throw new Error('API call failed');
+                    const data = await response.json();
+                    this.parkingSpots = data;
+
+                    // Vérifier que les valeurs de latitude et longitude sont bien des nombres
+                    const lat = parseFloat(this.parkingSpots.latitude);
+                    const lng = parseFloat(this.parkingSpots.longitude);
+
+                    
+                    // Vérifier si les lat et lng sont valides
+                    if (isNaN(lat) || isNaN(lng)) {
+                    throw new Error('Invalid latitude or longitude values');
+                    }
+
+                    this.marker.id = 'marker_' + this.parkingSpots.name
+                    this.marker.position.lat = this.parkingSpots.latitude
+                    this.marker.position.lng = this.parkingSpots.longitude
+                    this.NoteAd(this.parkingSpots)
+                    this.getReservations()
                 } catch (error) {
-                    console.log(error)
-                    this.setFallBackData()
+                    console.log("coucou")
+                    console.error(error);
+                    this.setFallBackData();
                 }
             } else {
-                this.setFallBackData()
+                this.setFallBackData();
+            }
+        },
+        async NoteAd(item) {
+            try {
+                const token = localStorage.getItem('idToken')
+                const response = await fetch(`http://localhost:8080/api/feedback/ad/${item.id}`, {
+                    method: 'GET',
+                    headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json'
+                    }
+                });
+                if (!response.ok) throw new Error('Failed to fetch ratings');
+                const ratings = await response.json();
+                this.feedbacks = ratings
+
+
+                let averageRating = 0; // Default average rating
+                if (ratings.length > 0) {
+                    averageRating = ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length;
+                }
+                this.parkingSpots.rating = averageRating.toFixed(1); // Store the average rating
+                return averageRating; // Return average for potential other uses
+            } catch (error) {
+                console.error(error);
+                this.parkingSpots.rating = 0; // Set default rating on error
+                return 0; // Return default rating
+            }
+        },
+        async getReservations() {
+            // pour cette fonction :
+                // récupe le nom et le prénom des users qui réservent 
+                // enlever le reste 
+            try {
+                const idToken = localStorage.getItem('idToken');
+
+                const url = `http://localhost:8080/api/reservation/ad/${this.parkingSpots.id}`
+                
+                const response = await fetch(url, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`, // Ajoute le token dans les headers
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) throw new Error('API call failed');
+                const data = await response.json();
+                for (let i in data) {
+                    if (data[i].statusId == 2) {
+                        const url = `http://localhost:8080/api/user/${data[i].userId}`
+
+                        const response = await fetch(url, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${idToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+
+                        const data2 = await response.json()
+                        data[i].firstname = data2.firstname
+                        data[i].lastname = data2.lastname
+                        this.reservations.push(data[i])
+                        
+                    }
+                }
+
+                
+            } catch (error) {
+                console.error(error);
+                this.setFallbackData();
             }
         },
         setFallBackData() {
@@ -151,14 +259,71 @@ export default {
             this.marker.lat = this.parkingSpots.lat
             this.marker.lng = this.parkingSpots.long
         },
-        accept(id) {
+        async accept(id) {
             console.log('Accepted:', id);
-            // Additional logic for accepting
+
+            this.acceptLoading = true
+            try {
+                const idToken = localStorage.getItem('idToken');
+
+                const url = `http://localhost:8080/api/reservation/accept/${id}`
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`, // Ajoute le token dans les headers
+                        'Content-Type': 'application/json'
+                    }
+                })
+
+                if (response.status == 200) {
+                    window.location.reload()
+                }
+
+            } catch (error) {
+                console.log(error)
+            }
+            this.acceptLoading = false
         },
-        refuse(id) {
+        async refuse(id) {
             console.log('Refused:', id);
-            // Additional logic for refusing
+            
+            this.cancelLoading = true
+            try {
+                const idToken = localStorage.getItem('idToken');
+
+                const url = `http://localhost:8080/api/reservation/cancel/${id}`
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`, // Ajoute le token dans les headers
+                        'Content-Type': 'application/json'
+                    }
+                })
+                console.log("y")
+                if (response.status == 200) {
+                    console.log("x")
+                    window.location.reload()
+                }
+
+            } catch (error) {
+                console.log(error)
+            }
+            this.cancelLoading = false
+        },
+        formatDate(dateString) {
+            const options = { 
+                year: 'numeric', 
+                month: 'long', 
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false // Utilise le format 24h
+            };
+            return new Date(dateString).toLocaleDateString('fr-FR', options);
         }
+
     }
 }
 </script>

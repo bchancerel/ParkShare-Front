@@ -9,17 +9,16 @@
             <div v-for="(item, index) in parkingSpots" :key="index" class="card col-12 col-md-6 mb-3">
                 <div class="row no-gutters">
                     <div class="col">
-                        <img src="../assets/static/image.png" class="card-img h-100" :alt="item.titre + ' Image'">
+                        <img src="../assets/static/image.png" class="card-img h-100" :alt="item.name + ' Image'">
                     </div>
                     <div class="col">
                         <div class="card-body">
-                            <h5 class="card-title">{{ item.titre }}</h5>
+                            <h5 class="card-title">{{ item.name }}</h5>
                             <p class="card-text">
-                                <small class="text-muted">⭐ {{ item.note }}</small>
+                                <small class="text-muted">⭐ {{ item.averageRating ? item.averageRating.toFixed(1) : 'N/A' }} | {{ item.hourPrice }} € / h</small>
                             </p>
                             <p class="card-text">
-                                <span>{{ item.distance }}m away</span> | 
-                                <span>{{ item.prix }} €</span>
+                                {{ item.description }}
                             </p>
                             <a :href="'/mes_annonces/' +  item.id ">
                                 <button class="btn btn-primary">Voir</button>
@@ -37,7 +36,7 @@ export default {
     data() {
         return {
             parkingSpots: [],
-            apiurl: ''
+            apiurl: 'http://localhost:8080/api/ads',
         };
     },
   
@@ -47,18 +46,56 @@ export default {
 
     methods: {
         async fetchParkingSpots() {
-            if (this.apiurl != '') {
+            if (this.apiurl !== '') {
                 try {
-                    const response = await fetch(this.apiurl);
+                    const token = localStorage.getItem('idToken'); // Récupère le token d'authentification
+                    const userId = localStorage.getItem('userId')
+                    const response = await fetch(this.apiurl, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`, // Ajoute le token dans les headers
+                            'Content-Type': 'application/json'
+                        }
+                    });
                     if (!response.ok) throw new Error('API call failed');
                     const data = await response.json();
-                    this.parkingSpots = data;
+                    for(let i in data) {
+                        if(data[i].userId === userId) {
+                            this.parkingSpots.push(data[i])
+                        }
+                    }
+
+                    this.NoteAd()
                 } catch (error) {
                     console.error(error);
                     this.setFallbackData();
                 }
             } else {
                 this.setFallbackData();
+            }
+        },
+        async NoteAd() {
+            for (let spot of this.parkingSpots) {
+                try {
+                    const token = localStorage.getItem('idToken'); // Récupère le token d'authentification
+                    const response = await fetch(`http://localhost:8080/api/feedback/ad/${spot.id}`, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`, // Ajoute le token dans les headers
+                            'Content-Type': 'application/json'
+                        }
+                    });
+                    if (!response.ok) throw new Error('Échec de la récupération des évaluations');
+                    const ratings = await response.json();
+                    let averageRating = 0; // Note moyenne par défaut
+                    if (ratings.length > 0) {
+                        averageRating = ratings.reduce((acc, curr) => acc + curr.rating, 0) / ratings.length;
+                    }
+                    spot.averageRating = averageRating;
+                } catch (error) {
+                    console.error(error);
+                    spot.averageRating = 0; // Définissez la note moyenne par défaut en cas d'erreur
+                }
             }
         },
         setFallbackData() {

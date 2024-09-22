@@ -46,7 +46,7 @@
             <div class="col-6">
                 <GMapMap
                     :center="{ lat: 44.8378, lng: -0.5792 }"
-                    :zoom="12" 
+                    :zoom="11" 
                     map-type-id="terrain" 
                     style="width: 100%; height: 700px;"
                     :options="{

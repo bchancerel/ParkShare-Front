@@ -35,6 +35,7 @@
                         <!-- Section Carte -->
                         <div class="map-container">
                             <hr>
+                            <p>By : <strong> {{ user.firstname }} {{ user.lastname }} </strong></p>
                             <p><strong> {{ parkingSpots.rating }} </strong> ⭐ | {{ parkingSpots.hourPrice }} € / h</p>
                         </div>
                     </div>
@@ -73,7 +74,7 @@
                         </div>
                         <div class="card-body">
                             <div class="icon-croix"></div>
-                            <p><strong>Utilisateur 1</strong></p>
+                            <p><strong>{{ item.firstname }} {{ item.lastname }}</strong></p>
                             <p>{{ item.description }}</p>
                             <p>{{ item.rating }} ⭐</p>
                             <p>écrit le : <strong>{{ formatDate(item.date) }}</strong></p>
@@ -101,7 +102,11 @@ export default {
                 description: '',
                 rating: 0
             },
-            userId : ''
+            userId : '',
+            user: {
+                firstname: '',
+                lastname: ''
+            }
         }
     },
     mounted() {
@@ -136,6 +141,7 @@ export default {
                     this.parkingSpots = data
 
                     this.NoteAd(this.parkingSpots)
+                    this.getUser(this.parkingSpots.userId)
                 } catch (error) {
                     console.log("coucou")
                     console.error(error)
@@ -143,6 +149,24 @@ export default {
             } else {
                 console.log("error")
             }
+        },
+        async getUser(id) {
+            const idToken = localStorage.getItem('idToken');
+
+            const url = `http://localhost:8080/api/user/${id}`
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers: {
+                    'Authorization': `Bearer ${idToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            const data = await response.json()
+            console.log(data)
+            this.user.firstname = data.firstname
+            this.user.lastname = data.lastname
         },
         async NoteAd(item) {
             try {
@@ -157,6 +181,21 @@ export default {
                 if (!response.ok) throw new Error('Failed to fetch ratings')
                 const data = await response.json()
                 this.feedbacks = data
+                for (let i in this.feedbacks) {
+                    const url = `http://localhost:8080/api/user/${this.feedbacks[i].userId}`
+
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        }
+                    });
+
+                    const data = await response.json()
+                    this.feedbacks[i].firstname = data.firstname
+                    this.feedbacks[i].lastname = data.lastname
+                }
                 console.log(this.feedbacks)
                 let averageRating = 0 
                 if (data.length > 0) {
