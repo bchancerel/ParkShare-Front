@@ -15,7 +15,7 @@ export default {
   },
   data() {
     return {
-      forbiddenPages : ['/login', '/register'],
+      forbiddenPages : ['/connexion', '/'],
     };
   },
   computed: {
@@ -34,7 +34,7 @@ $dark-grey: #6B6B6B;
 $white: #FEFAF8;
 $danger: #9C3434;
 
-#app {
+body {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -46,6 +46,12 @@ $danger: #9C3434;
     background-color: $primary;
     box-shadow: 0 4px 9px -4px $primary;
   }
+
+  .btn-primary:hover, .btn-primary:active {
+    background-color: $secondary;
+    box-shadow: 0 4px 9px -4px $secondary ;
+  }
+
 
   a {
     color: $secondary;
