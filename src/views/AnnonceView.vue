@@ -94,8 +94,8 @@
      <!-- Section des commentaires -->
     <hr>
     <div class="comments mt-5">
-      <h5>Commentaires</h5>
-      <div class="row">
+      <h3>Commentaires</h3>
+      <div v-if="feedbacks.length < 0" class="row">
         <div v-for="(item, index) in feedbacks" :key="index" class="col-md-6">
           <div class="card mb-3">
             <div class="card-body">
@@ -107,6 +107,7 @@
           </div>
         </div>
       </div>
+      <p>Il n'y aucun commentaire pour cette </p>
     </div>
   </div>
 </template>

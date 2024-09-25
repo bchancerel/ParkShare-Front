@@ -20,8 +20,11 @@
                             <p class="card-text">
                                 {{ item.description }}
                             </p>
-                            <a :href="'/mes_annonces/' +  item.id ">
+                            <a v-if="item.state == true" :href="'/mes_annonces/' +  item.id ">
                                 <button class="btn btn-primary">Voir</button>
+                            </a>
+                            <a v-if="item.state == false" :href="'/mes_annonces/' +  item.id ">
+                                <button class="btn btn-secondary">Voir Brouillon</button>
                             </a>
                         </div>
                     </div>

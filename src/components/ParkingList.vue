@@ -22,7 +22,7 @@
             <!-- Parking spots section -->
             <div class="col-6 overflow-auto mx-3" style="max-height: 700px;">
                 <div v-for="(item, index) in sortedParkingSpots" :key="index"  class="card mb-3">
-                    <div class="row g-0">
+                    <div v-if="item.state == true" class="row g-0">
                         <div class="col-md-4">
                             <img src="../assets/static/image.png" class="img-fluid rounded-start" :alt="item.name + ' Image'">
                         </div>

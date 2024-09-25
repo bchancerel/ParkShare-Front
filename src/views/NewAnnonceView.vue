@@ -11,46 +11,78 @@
                     <div class="col-12">
                         <h5>Ajouter des images (maximum 3)</h5>
                         <input type="file" name="photo" accept="image/*" @change="setPhotoFiles($event.target.name, $event.target.files)" />
-                        <div class="images-preview mt-2">
-                            <div v-for="(image, index) in parkingSpot.images" :key="index" class="image-container mx-2">
-                                <p>{{image}}</p>
-                                <button class="btn btn-danger btn-sm" @click="removeImage(index)">Supprimer</button>
-                            </div>
-                        </div>
                     </div>
 
                     <div class="col-12">
-                        <div class="form-group">
-                            <label for="title">Titre de l'annonce</label>
-                            <input
-                                type="text"
-                                v-model="parkingSpot.titre"
-                                class="form-control"
-                                id="title"
-                                :placeholder="parkingSpot.titre"
-                            />
-                        </div>
-                        <div class="description mb-3">
-                            <h5>Description</h5>
+                        <form @submit.prevent="submitForm">
                             <div class="form-group">
-                                <textarea
-                                    v-model="parkingSpot.description"
+                                <label for="title">Titre de l'annonce</label>
+                                <input
+                                    type="text"
+                                    v-model="formData.name"
                                     class="form-control"
-                                    id="description"
-                                    rows="3"
-                                    :placeholder="parkingSpot.description"
-                                ></textarea>
+                                    id="title"
+                                    :placeholder="formData.name"
+                                />
                             </div>
-                        </div>
-                        <div class="form-group">
-                            <label for="price">Prix</label>
-                            <input type="number"
-                                v-model="parkingSpot.prix"
-                                class="form-control"
-                                id="title"
-                                :placeholder="parkingSpot.prix">
-                        </div>
+                            <div class="description mb-3">
+                                <h5>Description</h5>
+                                <div class="form-group">
+                                    <textarea
+                                        v-model="formData.description"
+                                        class="form-control"
+                                        id="description"
+                                        rows="3"
+                                        :placeholder="formData.description"
+                                    ></textarea>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="price">Prix</label>
+                                <input type="number"
+                                    v-model="formData.hourPrice"
+                                    class="form-control"
+                                    id="title"
+                                    :placeholder="formData.hourPrice">
+                            </div>
+                            <hr>
+                            <div class="form-group">
+                                <label for="lat">Latitude</label>
+                                <input
+                                    type="number" step="0.000001"
+                                    v-model="formData.latitude"
+                                    class="form-control"
+                                    id="lat"
+                                    :placeholder="formData.latitude"
+                                />
+                            </div>
+                            <div class="form-group">
+                                <label for="long">Longitude</label>
+                                <input
+                                    type="number" step="0.000001"
+                                    v-model="formData.longitude"
+                                    class="form-control"
+                                    id="long"
+                                    :placeholder="formData.longitude"
+                                />
+                            </div>
+                            <div class="form-group my-3">
+                                <label for="featured" class="mx-2">Poster en public</label>
+                                <input
+                                    type="checkbox"
+                                    v-model="formData.state"
+                                    class="form-check-input"
+                                    id="featured"
+                                />
+                            </div>
+                            <div v-if="loading == true" class="spinner-border text-success" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                            <button v-else-if="loading == false && formData.state == true" type="submit" class="btn btn-success mt-2 mb-3">Poster annonce</button>
+                            <button v-else-if="loading == false && formData.state == false" type="submit" class="btn btn-success mt-2 mb-3">Garder en brouillon</button>
+                        </form>
                     </div>
+
 
                 </div>
             </div>
@@ -73,35 +105,11 @@
                         }"
                     >
                         <GMapMarker
-                        :key="parkingSpot.titre"
-                        :position="{ lat: parkingSpot.lat, lng: parkingSpot.long }"
+                        :key="formData.name"
+                        :position="{ lat: formData.latitude, lng: formData.longitude }"
                         />
                     </GMapMap>
                 </div>
-                <!-- Formulaire pour modifier les coordonnées -->
-                <div class="form-group">
-                    <label for="lat">Latitude</label>
-                    <input
-                        type="number"
-                        v-model="newLat"
-                        class="form-control"
-                        id="lat"
-                        :placeholder="parkingSpot.long"
-                    />
-                </div>
-                <div class="form-group">
-                    <label for="long">Longitude</label>
-                    <input
-                        type="number"
-                        v-model="newLong"
-                        class="form-control"
-                        id="long"
-                        :placeholder="parkingSpot.lat"
-                    />
-                </div>
-                <button class="btn btn-primary my-3" @click="updateCoordinates">
-                    Mettre à jour les coordonnées
-                </button>
             </div>
         </div>
     </div>
@@ -112,20 +120,16 @@ export default {
     name : 'NewAnnonce',
     data() {
         return {
-            parkingSpot: {
-                id: null,
-                titre: "",
+            apiurl: "http://localhost:8080/api/ads",
+            formData: {
+                name: "",
                 description: "",
-                images: [],
-                note: 0,
-                prix: 0,
-                lat: 0,
-                long: 0,
-                visible: true,
+                hourPrice: 0,
+                latitude: 0,
+                longitude: 0,
+                state: true
             },
-            newLat: null,
-            newLong: null,
-            uploadedImage: null,
+            loading: false
         };
     },
     beforeCreate() {
@@ -138,13 +142,45 @@ export default {
         }
     },
     methods: {
-        updateCoordinates() {
-            if (this.newLat && this.newLong) {
-                this.parkingSpot.lat = this.newLat;
-                this.parkingSpot.long = this.newLong;
-            } else {
-                alert("Veuillez entrer des coordonnées valides.");
+        async submitForm() {
+            this.loading = true
+            try {
+                const idToken = localStorage.getItem('idToken');
+
+                const url = this.apiurl
+
+
+                // Créer l'objet à envoyer dans le corps de la requête
+                const updatedData = {
+                    name: this.formData.name,
+                    description: this.formData.description,
+                    hourPrice: this.formData.hourPrice,
+                    latitude: this.formData.latitude,
+                    longitude: this.formData.longitude,
+                    state: this.formData.state,
+                    link: ""
+                };
+                console.log(updatedData)
+
+                const response = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${idToken}`, // Ajoute le token dans les headers
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(updatedData)
+                });
+
+                console.log(response)
+                if (response.status == 201) {
+                    console.log("success")
+                    this.$router.push('/profil')
+                }
+            } catch (error) {
+                console.error('Erreur lors de la soumission du formulaire:', error);
+                alert('Une erreur est survenue lors de la soumission du formulaire');
             }
+            this.loading = false
         },
         handleFileUpload(event) {
             const files = Array.from(event.target.files);
@@ -163,10 +199,6 @@ export default {
         removeImage(index) {
             this.parkingSpot.images.splice(index, 1);
         },
-    },
-    mounted() {
-        // Simuler l'appel API ou charger des données fictives
-        this.fetchParkingSpot(null); // Passez l'URL de l'API ici si disponible
     },
 };
 </script>
